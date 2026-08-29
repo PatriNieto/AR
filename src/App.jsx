@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-import "./style.css";
+import "./index.css";
 
 function ParticleSystem({ scene }) {
   const pointsRef = useRef(null);
