@@ -1,90 +1,41 @@
-/* eslint-disable react-hooks/purity */
+/* eslint-disable react-hooks/refs */
 
-import React, { useEffect, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import "./index.css";
 
-/* =========================================================
-   CÁMARA DEL TELÉFONO
-========================================================= */
+import "./style.css";
 
-function CameraBackground() {
-  const videoRef = useRef(null);
+function ParticleSystem({ scene }) {
+  const pointsRef = useRef(null);
+
+  const COUNT = 8000;
 
   useEffect(() => {
-    let stream;
+    /*
+     * --------------------------------------------------
+     * GEOMETRÍA
+     * --------------------------------------------------
+     */
 
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: {
-              ideal: "environment",
-            },
-            width: {
-              ideal: 1920,
-            },
-            height: {
-              ideal: 1080,
-            },
-          },
-          audio: false,
-        });
+    const geometry =
+      new THREE.BufferGeometry();
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch (error) {
-        console.error("Error cámara:", error);
-      }
-    }
-
-    startCamera();
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => {
-          track.stop();
-        });
-      }
-    };
-  }, []);
-
-  return (
-    <video
-      ref={videoRef}
-      className="camera"
-      autoPlay
-      muted
-      playsInline
-    />
-  );
-}
-
-
-/* =========================================================
-   PARTÍCULAS
-========================================================= */
-
-function Particles({
-  count = 5000,
-}) {
-  const pointsRef = useRef();
-
-  const particles = React.useMemo(() => {
     const positions =
-      new Float32Array(count * 3);
+      new Float32Array(COUNT * 3);
 
     const velocities =
-      new Float32Array(count * 3);
+      new Float32Array(COUNT * 3);
 
-    const random =
-      new Float32Array(count);
+    const randomness =
+      new Float32Array(COUNT);
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < COUNT; i++) {
       const i3 = i * 3;
+
+      /*
+       * Distribuir partículas
+       * alrededor del origen.
+       */
 
       const radius =
         Math.random() * 1.5;
@@ -99,12 +50,16 @@ function Particles({
         radius;
 
       positions[i3 + 1] =
-        Math.random() * 2 -
-        1;
+        Math.random() *
+        1.5;
 
       positions[i3 + 2] =
         Math.sin(angle) *
         radius;
+
+      /*
+       * Velocidad
+       */
 
       velocities[i3] =
         (Math.random() - 0.5) *
@@ -119,115 +74,202 @@ function Particles({
         (Math.random() - 0.5) *
         0.15;
 
-      random[i] =
+      randomness[i] =
         Math.random() *
         Math.PI *
         2;
     }
 
-    return {
-      positions,
-      velocities,
-      random,
-    };
-  }, [count]);
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(
+        positions,
+        3
+      )
+    );
 
+    /*
+     * --------------------------------------------------
+     * MATERIAL
+     * --------------------------------------------------
+     */
 
-  useFrame((state, delta) => {
-    if (!pointsRef.current) {
-      return;
-    }
+    const material =
+      new THREE.PointsMaterial({
+        color: 0x00ffff,
 
-    const positions =
-      pointsRef.current.geometry
-        .attributes.position.array;
+        size: 0.025,
 
-    const time =
-      state.clock.elapsedTime;
+        transparent: true,
 
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
+        opacity: 0.9,
 
-      positions[i3 + 1] +=
-        particles.velocities[i3 + 1] *
-        delta;
+        depthWrite: false,
 
-      positions[i3] +=
-        Math.sin(
-          time +
-          particles.random[i]
-        ) *
-        0.001;
+        blending:
+          THREE.AdditiveBlending,
+      });
 
-      positions[i3 + 2] +=
-        Math.cos(
-          time +
-          particles.random[i]
-        ) *
-        0.001;
+    /*
+     * --------------------------------------------------
+     * PARTICLE OBJECT
+     * --------------------------------------------------
+     */
 
-      if (positions[i3 + 1] > 1) {
-        positions[i3 + 1] = -1;
-      }
-    }
+    const particles =
+      new THREE.Points(
+        geometry,
+        material
+      );
 
-    pointsRef.current.geometry.attributes
-      .position.needsUpdate = true;
+    /*
+     * Colocamos inicialmente
+     * delante de la cámara.
+     */
 
-    pointsRef.current.rotation.y +=
-      delta * 0.15;
-  });
+    particles.position.set(
+      0,
+      0,
+      -2
+    );
 
+    scene.add(particles);
 
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={
-            particles.positions.length / 3
-          }
-          array={particles.positions}
-          itemSize={3}
-        />
-      </bufferGeometry>
+    pointsRef.current = particles;
 
-      <pointsMaterial
-        color="#00ffff"
-        size={0.025}
-        transparent
-        opacity={0.9}
-        depthWrite={false}
-        blending={
-          THREE.AdditiveBlending
+    /*
+     * --------------------------------------------------
+     * ANIMATION
+     * --------------------------------------------------
+     */
+
+    let animationFrame;
+
+    const clock =
+      new THREE.Clock();
+
+    function animate() {
+      animationFrame =
+        requestAnimationFrame(
+          animate
+        );
+
+      const delta =
+        clock.getDelta();
+
+      const time =
+        clock.elapsedTime;
+
+      const positionAttribute =
+        geometry.attributes.position;
+
+      const array =
+        positionAttribute.array;
+
+      for (
+        let i = 0;
+        i < COUNT;
+        i++
+      ) {
+        const i3 = i * 3;
+
+        /*
+         * Movimiento vertical
+         */
+
+        array[i3 + 1] +=
+          velocities[i3 + 1] *
+          delta;
+
+        /*
+         * Movimiento orgánico
+         */
+
+        array[i3] +=
+          Math.sin(
+            time * 1.5 +
+            randomness[i]
+          ) *
+          0.001;
+
+        array[i3 + 2] +=
+          Math.cos(
+            time * 1.2 +
+            randomness[i]
+          ) *
+          0.001;
+
+        /*
+         * Reiniciar partículas
+         */
+
+        if (
+          array[i3 + 1] >
+          1.5
+        ) {
+          array[i3 + 1] =
+            0;
         }
-      />
-    </points>
-  );
+      }
+
+      positionAttribute.needsUpdate =
+        true;
+
+      /*
+       * Rotación suave
+       */
+
+      particles.rotation.y +=
+        delta * 0.1;
+    }
+
+    animate();
+
+    /*
+     * Cleanup
+     */
+
+    return () => {
+      cancelAnimationFrame(
+        animationFrame
+      );
+
+      geometry.dispose();
+
+      material.dispose();
+
+      scene.remove(
+        particles
+      );
+    };
+  }, [scene]);
+
+  return null;
 }
 
 
-/* =========================================================
-   ESCENA
-========================================================= */
-
-function Scene() {
-  return (
-    <>
-      <Particles count={5000} />
-    </>
-  );
-}
-
-
-/* =========================================================
-   APP
-========================================================= */
+/*
+ * ======================================================
+ * APP
+ * ======================================================
+ */
 
 export default function App() {
+  const containerRef =
+    useRef(null);
+
+  const rendererRef =
+    useRef(null);
+
+  const sceneRef =
+    useRef(null);
+
+  const cameraRef =
+    useRef(null);
+
   const [
-    cameraStarted,
-    setCameraStarted,
+    started,
+    setStarted,
   ] = useState(false);
 
   const [
@@ -235,54 +277,271 @@ export default function App() {
     setError,
   ] = useState("");
 
+  /*
+   * --------------------------------------------------
+   * INICIALIZAR THREE.JS
+   * --------------------------------------------------
+   */
+
+  useEffect(() => {
+    if (!started) {
+      return;
+    }
+
+    const container =
+      containerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    /*
+     * Scene
+     */
+
+    const scene =
+      new THREE.Scene();
+
+    sceneRef.current =
+      scene;
+
+    /*
+     * Camera
+     */
+
+    const camera =
+      new THREE.PerspectiveCamera(
+        60,
+        window.innerWidth /
+          window.innerHeight,
+        0.01,
+        100
+      );
+
+    camera.position.set(
+      0,
+      0,
+      0
+    );
+
+    cameraRef.current =
+      camera;
+
+    /*
+     * Renderer
+     */
+
+    const renderer =
+      new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+      });
+
+    renderer.setPixelRatio(
+      Math.min(
+        window.devicePixelRatio,
+        2
+      )
+    );
+
+    renderer.setSize(
+      window.innerWidth,
+      window.innerHeight
+    );
+
+    renderer.xr.enabled =
+      false;
+
+    rendererRef.current =
+      renderer;
+
+    container.appendChild(
+      renderer.domElement
+    );
+
+    /*
+     * Fondo transparente.
+     * La cámara AR estará
+     * detrás del canvas.
+     */
+
+    renderer.setClearColor(
+      0x000000,
+      0
+    );
+
+    /*
+     * Luz
+     */
+
+    const ambient =
+      new THREE.AmbientLight(
+        0xffffff,
+        1
+      );
+
+    scene.add(ambient);
+
+    /*
+     * Resize
+     */
+
+    function resize() {
+      camera.aspect =
+        window.innerWidth /
+        window.innerHeight;
+
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+      );
+    }
+
+    window.addEventListener(
+      "resize",
+      resize
+    );
+
+    /*
+     * Render loop
+     */
+
+    function render() {
+      renderer.render(
+        scene,
+        camera
+      );
+    }
+
+    renderer.setAnimationLoop(
+      render
+    );
+
+    /*
+     * Cleanup
+     */
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        resize
+      );
+
+      renderer.setAnimationLoop(
+        null
+      );
+
+      renderer.dispose();
+
+      if (
+        renderer.domElement
+          .parentNode
+      ) {
+        renderer.domElement
+          .parentNode
+          .removeChild(
+            renderer.domElement
+          );
+      }
+    };
+  }, [started]);
+
+
+  /*
+   * --------------------------------------------------
+   * START
+   * --------------------------------------------------
+   */
+
   async function startAR() {
     try {
+      setError("");
+
+      /*
+       * Comprobar cámara
+       */
+
       if (
         !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
+        !navigator.mediaDevices
+          .getUserMedia
       ) {
         throw new Error(
-          "Tu navegador no permite acceder a la cámara."
+          "Este navegador no permite acceso a la cámara."
         );
       }
 
-      await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-        },
-        audio: false,
-      });
+      /*
+       * Pedir permiso.
+       *
+       * Esto funciona tanto en
+       * iPhone como Android.
+       */
 
-      setCameraStarted(true);
+      await navigator.mediaDevices
+        .getUserMedia({
+          video: {
+            facingMode: {
+              ideal:
+                "environment",
+            },
+
+            width: {
+              ideal: 1920,
+            },
+
+            height: {
+              ideal: 1080,
+            },
+          },
+
+          audio: false,
+        });
+
+      setStarted(true);
 
     } catch (err) {
       console.error(err);
 
       setError(
-        "No se puede acceder a la cámara. Comprueba los permisos."
+        err?.message ||
+          "No se pudo iniciar la cámara."
       );
     }
   }
 
 
+  /*
+   * --------------------------------------------------
+   * UI
+   * --------------------------------------------------
+   */
+
   return (
     <div className="app">
 
-      {!cameraStarted && (
-        <div className="start-screen">
+      {!started && (
+        <div className="start">
+
+          <div className="logo">
+            ✨
+          </div>
 
           <h1>
-            ✨ AR Particles
+            AR Particles
           </h1>
 
           <p>
-            Activa la cámara para comenzar
+            Experiencia AR para
+            iPhone y Android
           </p>
 
           <button
             onClick={startAR}
           >
-            Iniciar AR
+            Activar cámara
           </button>
 
           {error && (
@@ -294,32 +553,33 @@ export default function App() {
         </div>
       )}
 
-
-      {cameraStarted && (
+      {started && (
         <>
-          <CameraBackground />
+          <div
+            ref={containerRef}
+            className="three-container"
+          />
 
-          <Canvas
-            camera={{
-              position: [
-                0,
-                0,
-                3,
-              ],
-              fov: 60,
-            }}
-            gl={{
-              alpha: true,
-              antialias: true,
-            }}
-          >
-            <Scene />
-          </Canvas>
+          // eslint-disable-next-line react-hooks/refs
+          {sceneRef.current && (
+            <ParticleSystem
+              scene={
+                sceneRef.current
+              }
+            />
+          )}
 
-          <div className="ar-ui">
-            <div className="badge">
-              AR activa
+          <div className="hud">
+
+            <div className="status">
+              ● AR
             </div>
+
+            <div className="instructions">
+              Mueve el teléfono para
+              explorar las partículas
+            </div>
+
           </div>
         </>
       )}
