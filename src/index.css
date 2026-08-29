@@ -10,7 +10,9 @@ body,
 }
 
 body {
+  margin: 0;
   background: #000;
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -20,16 +22,22 @@ body {
 
 .app {
   position: relative;
+
   width: 100%;
   height: 100%;
+
   overflow: hidden;
 }
 
 
-/* Cámara */
+/* =====================================================
+   CÁMARA
+===================================================== */
 
 .camera {
   position: absolute;
+
+  inset: 0;
 
   width: 100%;
   height: 100%;
@@ -40,21 +48,34 @@ body {
 }
 
 
-/* Three.js */
+/* =====================================================
+   THREE.JS
+===================================================== */
 
-canvas {
-  position: absolute !important;
+.three-container {
+  position: absolute;
 
   inset: 0;
 
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
 
   z-index: 1;
+
+  pointer-events: none;
+}
+
+.three-container canvas {
+  display: block;
+
+  width: 100% !important;
+  height: 100% !important;
 }
 
 
-/* Pantalla inicial */
+/* =====================================================
+   START SCREEN
+===================================================== */
 
 .start-screen {
   position: absolute;
@@ -67,11 +88,13 @@ canvas {
 
   flex-direction: column;
 
-  align-items: center;
-
   justify-content: center;
 
+  align-items: center;
+
   padding: 30px;
+
+  box-sizing: border-box;
 
   text-align: center;
 
@@ -81,29 +104,33 @@ canvas {
     radial-gradient(
       circle at center,
       #102030,
-      #000
+      #000000
     );
 }
 
+.logo {
+  font-size: 60px;
+
+  margin-bottom: 10px;
+}
 
 .start-screen h1 {
-  font-size: 38px;
-
   margin: 0 0 10px;
-}
 
+  font-size: 36px;
+}
 
 .start-screen p {
-  opacity: 0.7;
+  margin: 0 0 30px;
 
-  margin-bottom: 30px;
+  opacity: 0.7;
 }
 
-
 .start-screen button {
-  border: none;
+  border: 0;
 
-  padding: 16px 32px;
+  padding:
+    15px 28px;
 
   border-radius: 999px;
 
@@ -114,37 +141,60 @@ canvas {
   font-size: 17px;
 
   font-weight: 600;
+
+  cursor: pointer;
 }
 
+.start-screen button:active {
+  transform: scale(0.96);
+}
+
+
+/* =====================================================
+   ERROR
+===================================================== */
 
 .error {
   margin-top: 20px;
 
-  max-width: 300px;
+  max-width: 320px;
 
   color: #ff7777;
+
+  font-size: 14px;
 }
 
 
-/* UI AR */
+/* =====================================================
+   HUD
+===================================================== */
 
-.ar-ui {
+.hud {
   position: absolute;
 
   z-index: 5;
 
-  top: 30px;
+  top: 25px;
 
   left: 50%;
 
   transform:
     translateX(-50%);
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 10px;
+
+  pointer-events: none;
 }
 
-
-.badge {
+.status {
   padding:
-    10px 18px;
+    8px 16px;
 
   border-radius: 999px;
 
@@ -153,9 +203,27 @@ canvas {
 
   color: white;
 
+  font-size: 13px;
+
   backdrop-filter:
     blur(10px);
+}
 
-  font-size: 14px;
+.instructions {
+  padding:
+    8px 15px;
+
+  border-radius: 999px;
+
+  background:
+    rgba(0, 0, 0, 0.4);
+
+  color:
+    rgba(255, 255, 255, 0.8);
+
+  font-size: 12px;
+
+  backdrop-filter:
+    blur(10px);
 }
 

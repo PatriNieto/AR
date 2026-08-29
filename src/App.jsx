@@ -1,286 +1,79 @@
-/* eslint-disable react-hooks/refs */
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import "./index.css";
 
-function ParticleSystem({ scene }) {
-  const pointsRef = useRef(null);
-
-  const COUNT = 8000;
-
-  useEffect(() => {
-    /*
-     * --------------------------------------------------
-     * GEOMETRÍA
-     * --------------------------------------------------
-     */
-
-    const geometry =
-      new THREE.BufferGeometry();
-
-    const positions =
-      new Float32Array(COUNT * 3);
-
-    const velocities =
-      new Float32Array(COUNT * 3);
-
-    const randomness =
-      new Float32Array(COUNT);
-
-    for (let i = 0; i < COUNT; i++) {
-      const i3 = i * 3;
-
-      /*
-       * Distribuir partículas
-       * alrededor del origen.
-       */
-
-      const radius =
-        Math.random() * 1.5;
-
-      const angle =
-        Math.random() *
-        Math.PI *
-        2;
-
-      positions[i3] =
-        Math.cos(angle) *
-        radius;
-
-      positions[i3 + 1] =
-        Math.random() *
-        1.5;
-
-      positions[i3 + 2] =
-        Math.sin(angle) *
-        radius;
-
-      /*
-       * Velocidad
-       */
-
-      velocities[i3] =
-        (Math.random() - 0.5) *
-        0.15;
-
-      velocities[i3 + 1] =
-        Math.random() *
-        0.3 +
-        0.05;
-
-      velocities[i3 + 2] =
-        (Math.random() - 0.5) *
-        0.15;
-
-      randomness[i] =
-        Math.random() *
-        Math.PI *
-        2;
-    }
-
-    geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(
-        positions,
-        3
-      )
-    );
-
-    /*
-     * --------------------------------------------------
-     * MATERIAL
-     * --------------------------------------------------
-     */
-
-    const material =
-      new THREE.PointsMaterial({
-        color: 0x00ffff,
-
-        size: 0.025,
-
-        transparent: true,
-
-        opacity: 0.9,
-
-        depthWrite: false,
-
-        blending:
-          THREE.AdditiveBlending,
-      });
-
-    /*
-     * --------------------------------------------------
-     * PARTICLE OBJECT
-     * --------------------------------------------------
-     */
-
-    const particles =
-      new THREE.Points(
-        geometry,
-        material
-      );
-
-    /*
-     * Colocamos inicialmente
-     * delante de la cámara.
-     */
-
-    particles.position.set(
-      0,
-      0,
-      -2
-    );
-
-    scene.add(particles);
-
-    pointsRef.current = particles;
-
-    /*
-     * --------------------------------------------------
-     * ANIMATION
-     * --------------------------------------------------
-     */
-
-    let animationFrame;
-
-    const clock =
-      new THREE.Clock();
-
-    function animate() {
-      animationFrame =
-        requestAnimationFrame(
-          animate
-        );
-
-      const delta =
-        clock.getDelta();
-
-      const time =
-        clock.elapsedTime;
-
-      const positionAttribute =
-        geometry.attributes.position;
-
-      const array =
-        positionAttribute.array;
-
-      for (
-        let i = 0;
-        i < COUNT;
-        i++
-      ) {
-        const i3 = i * 3;
-
-        /*
-         * Movimiento vertical
-         */
-
-        array[i3 + 1] +=
-          velocities[i3 + 1] *
-          delta;
-
-        /*
-         * Movimiento orgánico
-         */
-
-        array[i3] +=
-          Math.sin(
-            time * 1.5 +
-            randomness[i]
-          ) *
-          0.001;
-
-        array[i3 + 2] +=
-          Math.cos(
-            time * 1.2 +
-            randomness[i]
-          ) *
-          0.001;
-
-        /*
-         * Reiniciar partículas
-         */
-
-        if (
-          array[i3 + 1] >
-          1.5
-        ) {
-          array[i3 + 1] =
-            0;
-        }
-      }
-
-      positionAttribute.needsUpdate =
-        true;
-
-      /*
-       * Rotación suave
-       */
-
-      particles.rotation.y +=
-        delta * 0.1;
-    }
-
-    animate();
-
-    /*
-     * Cleanup
-     */
-
-    return () => {
-      cancelAnimationFrame(
-        animationFrame
-      );
-
-      geometry.dispose();
-
-      material.dispose();
-
-      scene.remove(
-        particles
-      );
-    };
-  }, [scene]);
-
-  return null;
-}
-
-
-/*
- * ======================================================
- * APP
- * ======================================================
- */
-
 export default function App() {
-  const containerRef =
-    useRef(null);
+  const videoRef = useRef(null);
+  const containerRef = useRef(null);
 
-  const rendererRef =
-    useRef(null);
-
-  const sceneRef =
-    useRef(null);
-
-  const cameraRef =
-    useRef(null);
-
-  const [
-    started,
-    setStarted,
-  ] = useState(false);
-
-  const [
-    error,
-    setError,
-  ] = useState("");
+  const [started, setStarted] = useState(false);
+  const [error, setError] = useState("");
 
   /*
-   * --------------------------------------------------
-   * INICIALIZAR THREE.JS
-   * --------------------------------------------------
+   * =====================================================
+   * INICIAR CÁMARA
+   * =====================================================
+   */
+
+  async function startAR() {
+    try {
+      setError("");
+
+      if (
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        throw new Error(
+          "Este navegador no permite acceder a la cámara."
+        );
+      }
+
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: {
+              ideal: "environment",
+            },
+            width: {
+              ideal: 1920,
+            },
+            height: {
+              ideal: 1080,
+            },
+          },
+          audio: false,
+        });
+
+      /*
+       * IMPORTANTE:
+       * Guardamos el stream en el vídeo.
+       */
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+
+        await videoRef.current.play();
+      }
+
+      setStarted(true);
+
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err?.message ||
+          "No se pudo acceder a la cámara."
+      );
+    }
+  }
+
+
+  /*
+   * =====================================================
+   * THREE.JS
+   * =====================================================
    */
 
   useEffect(() => {
@@ -295,18 +88,21 @@ export default function App() {
       return;
     }
 
+
     /*
-     * Scene
+     * -----------------------------------------------------
+     * SCENE
+     * -----------------------------------------------------
      */
 
     const scene =
       new THREE.Scene();
 
-    sceneRef.current =
-      scene;
 
     /*
-     * Camera
+     * -----------------------------------------------------
+     * CAMERA
+     * -----------------------------------------------------
      */
 
     const camera =
@@ -324,11 +120,11 @@ export default function App() {
       0
     );
 
-    cameraRef.current =
-      camera;
 
     /*
-     * Renderer
+     * -----------------------------------------------------
+     * RENDERER
+     * -----------------------------------------------------
      */
 
     const renderer =
@@ -349,41 +145,276 @@ export default function App() {
       window.innerHeight
     );
 
-    renderer.xr.enabled =
-      false;
-
-    rendererRef.current =
-      renderer;
-
-    container.appendChild(
-      renderer.domElement
-    );
-
-    /*
-     * Fondo transparente.
-     * La cámara AR estará
-     * detrás del canvas.
-     */
-
     renderer.setClearColor(
       0x000000,
       0
     );
 
+    container.appendChild(
+      renderer.domElement
+    );
+
+
     /*
-     * Luz
+     * -----------------------------------------------------
+     * PARTÍCULAS
+     * -----------------------------------------------------
      */
 
-    const ambient =
-      new THREE.AmbientLight(
-        0xffffff,
-        1
+    const COUNT = 6000;
+
+    const positions =
+      new Float32Array(
+        COUNT * 3
       );
 
-    scene.add(ambient);
+    const velocities =
+      new Float32Array(
+        COUNT * 3
+      );
+
+    const random =
+      new Float32Array(
+        COUNT
+      );
+
+
+    for (
+      let i = 0;
+      i < COUNT;
+      i++
+    ) {
+      const i3 = i * 3;
+
+      /*
+       * Distribución circular
+       */
+
+      const radius =
+        Math.random() * 1.2;
+
+      const angle =
+        Math.random() *
+        Math.PI *
+        2;
+
+      positions[i3] =
+        Math.cos(angle) *
+        radius;
+
+      positions[i3 + 1] =
+        Math.random() * 1.5 -
+        0.5;
+
+      positions[i3 + 2] =
+        Math.sin(angle) *
+        radius;
+
+
+      /*
+       * Velocidad
+       */
+
+      velocities[i3] =
+        (Math.random() - 0.5) *
+        0.2;
+
+      velocities[i3 + 1] =
+        Math.random() *
+        0.25 +
+        0.03;
+
+      velocities[i3 + 2] =
+        (Math.random() - 0.5) *
+        0.2;
+
+
+      random[i] =
+        Math.random() *
+        Math.PI *
+        2;
+    }
+
 
     /*
-     * Resize
+     * -----------------------------------------------------
+     * GEOMETRY
+     * -----------------------------------------------------
+     */
+
+    const geometry =
+      new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(
+        positions,
+        3
+      )
+    );
+
+
+    /*
+     * -----------------------------------------------------
+     * MATERIAL
+     * -----------------------------------------------------
+     */
+
+    const material =
+      new THREE.PointsMaterial({
+        color: 0x00ffff,
+        size: 0.035,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        blending:
+          THREE.AdditiveBlending,
+      });
+
+
+    /*
+     * -----------------------------------------------------
+     * PARTICLES
+     * -----------------------------------------------------
+     */
+
+    const particles =
+      new THREE.Points(
+        geometry,
+        material
+      );
+
+
+    /*
+     * MUY IMPORTANTE:
+     *
+     * Las partículas tienen que estar
+     * delante de la cámara.
+     */
+
+    particles.position.set(
+      0,
+      0,
+      -3
+    );
+
+    scene.add(
+      particles
+    );
+
+
+    /*
+     * -----------------------------------------------------
+     * ANIMATION
+     * -----------------------------------------------------
+     */
+
+    const clock =
+      new THREE.Clock();
+
+    let animationFrame;
+
+
+    function animate() {
+      animationFrame =
+        requestAnimationFrame(
+          animate
+        );
+
+      const delta =
+        clock.getDelta();
+
+      const time =
+        clock.elapsedTime;
+
+      const positionAttribute =
+        geometry.attributes.position;
+
+      const array =
+        positionAttribute.array;
+
+
+      for (
+        let i = 0;
+        i < COUNT;
+        i++
+      ) {
+        const i3 = i * 3;
+
+
+        /*
+         * Movimiento vertical
+         */
+
+        array[i3 + 1] +=
+          velocities[i3 + 1] *
+          delta;
+
+
+        /*
+         * Movimiento horizontal
+         */
+
+        array[i3] +=
+          Math.sin(
+            time * 1.5 +
+            random[i]
+          ) *
+          0.001;
+
+
+        array[i3 + 2] +=
+          Math.cos(
+            time * 1.2 +
+            random[i]
+          ) *
+          0.001;
+
+
+        /*
+         * Reiniciar
+         */
+
+        if (
+          array[i3 + 1] >
+          1
+        ) {
+          array[i3 + 1] =
+            -0.8;
+        }
+      }
+
+
+      positionAttribute.needsUpdate =
+        true;
+
+
+      /*
+       * Rotación
+       */
+
+      particles.rotation.y +=
+        delta * 0.1;
+
+
+      /*
+       * Render
+       */
+
+      renderer.render(
+        scene,
+        camera
+      );
+    }
+
+
+    animate();
+
+
+    /*
+     * -----------------------------------------------------
+     * RESIZE
+     * -----------------------------------------------------
      */
 
     function resize() {
@@ -399,131 +430,86 @@ export default function App() {
       );
     }
 
+
     window.addEventListener(
       "resize",
       resize
     );
 
-    /*
-     * Render loop
-     */
-
-    function render() {
-      renderer.render(
-        scene,
-        camera
-      );
-    }
-
-    renderer.setAnimationLoop(
-      render
-    );
 
     /*
-     * Cleanup
+     * -----------------------------------------------------
+     * CLEANUP
+     * -----------------------------------------------------
      */
 
     return () => {
+      cancelAnimationFrame(
+        animationFrame
+      );
+
       window.removeEventListener(
         "resize",
         resize
       );
 
-      renderer.setAnimationLoop(
-        null
-      );
+      geometry.dispose();
+
+      material.dispose();
 
       renderer.dispose();
 
       if (
-        renderer.domElement
-          .parentNode
+        renderer.domElement.parentNode
       ) {
-        renderer.domElement
-          .parentNode
-          .removeChild(
-            renderer.domElement
-          );
+        renderer.domElement.parentNode.removeChild(
+          renderer.domElement
+        );
       }
     };
   }, [started]);
 
 
   /*
-   * --------------------------------------------------
-   * START
-   * --------------------------------------------------
+   * =====================================================
+   * PARAR CÁMARA
+   * =====================================================
    */
 
-  async function startAR() {
-    try {
-      setError("");
+  useEffect(() => {
+    return () => {
+      const video =
+        videoRef.current;
 
-      /*
-       * Comprobar cámara
-       */
-
-      if (
-        !navigator.mediaDevices ||
-        !navigator.mediaDevices
-          .getUserMedia
-      ) {
-        throw new Error(
-          "Este navegador no permite acceso a la cámara."
-        );
+      if (!video) {
+        return;
       }
 
-      /*
-       * Pedir permiso.
-       *
-       * Esto funciona tanto en
-       * iPhone como Android.
-       */
+      const stream =
+        video.srcObject;
 
-      await navigator.mediaDevices
-        .getUserMedia({
-          video: {
-            facingMode: {
-              ideal:
-                "environment",
-            },
-
-            width: {
-              ideal: 1920,
-            },
-
-            height: {
-              ideal: 1080,
-            },
-          },
-
-          audio: false,
-        });
-
-      setStarted(true);
-
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err?.message ||
-          "No se pudo iniciar la cámara."
-      );
-    }
-  }
+      if (stream) {
+        stream
+          .getTracks()
+          .forEach((track) => {
+            track.stop();
+          });
+      }
+    };
+  }, []);
 
 
   /*
-   * --------------------------------------------------
+   * =====================================================
    * UI
-   * --------------------------------------------------
+   * =====================================================
    */
 
   return (
     <div className="app">
 
       {!started && (
-        <div className="start">
+        <div className="start-screen">
 
           <div className="logo">
             ✨
@@ -534,8 +520,8 @@ export default function App() {
           </h1>
 
           <p>
-            Experiencia AR para
-            iPhone y Android
+            Partículas en realidad
+            aumentada
           </p>
 
           <button
@@ -553,21 +539,42 @@ export default function App() {
         </div>
       )}
 
+
       {started && (
         <>
+
+          {/*
+           * =============================================
+           * CÁMARA
+           * =============================================
+           */}
+
+          <video
+            ref={videoRef}
+            className="camera"
+            autoPlay
+            muted
+            playsInline
+          />
+
+
+          {/*
+           * =============================================
+           * THREE.JS
+           * =============================================
+           */}
+
           <div
             ref={containerRef}
             className="three-container"
           />
 
-          // eslint-disable-next-line react-hooks/refs
-          {sceneRef.current && (
-            <ParticleSystem
-              scene={
-                sceneRef.current
-              }
-            />
-          )}
+
+          {/*
+           * =============================================
+           * HUD
+           * =============================================
+           */}
 
           <div className="hud">
 
@@ -576,11 +583,11 @@ export default function App() {
             </div>
 
             <div className="instructions">
-              Mueve el teléfono para
-              explorar las partículas
+              Mueve el teléfono
             </div>
 
           </div>
+
         </>
       )}
 
