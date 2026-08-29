@@ -1,242 +1,330 @@
 /* eslint-disable react-hooks/purity */
-import { useMemo, useRef } from "react";
-import * as THREE from "three";
+
+import React, { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import {
-  XR,
-  createXRStore,
-  XRButton,
-} from "@react-three/xr";
+import * as THREE from "three";
+import "./index.css";
 
-const xrStore = createXRStore();
+/* =========================================================
+   CÁMARA DEL TELÉFONO
+========================================================= */
 
-/*
- * Sistema de partículas
- */
-function ParticleSystem({
+function CameraBackground() {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    let stream;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: {
+              ideal: "environment",
+            },
+            width: {
+              ideal: 1920,
+            },
+            height: {
+              ideal: 1080,
+            },
+          },
+          audio: false,
+        });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch (error) {
+        console.error("Error cámara:", error);
+      }
+    }
+
+    startCamera();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+      }
+    };
+  }, []);
+
+  return (
+    <video
+      ref={videoRef}
+      className="camera"
+      autoPlay
+      muted
+      playsInline
+    />
+  );
+}
+
+
+/* =========================================================
+   PARTÍCULAS
+========================================================= */
+
+function Particles({
   count = 5000,
-  radius = 2,
-  color = "#00ffff",
 }) {
   const pointsRef = useRef();
 
-  const particles = useMemo(() => {
-    const positions = new Float32Array(count * 3);
-    const velocities = new Float32Array(count * 3);
-    const offsets = new Float32Array(count);
+  const particles = React.useMemo(() => {
+    const positions =
+      new Float32Array(count * 3);
+
+    const velocities =
+      new Float32Array(count * 3);
+
+    const random =
+      new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      // Distribución inicial alrededor del origen
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
+      const radius =
+        Math.random() * 1.5;
 
-      const r = Math.pow(Math.random(), 1 / 3) * radius;
+      const angle =
+        Math.random() *
+        Math.PI *
+        2;
 
       positions[i3] =
-        r * Math.sin(phi) * Math.cos(theta);
+        Math.cos(angle) *
+        radius;
 
       positions[i3 + 1] =
-        r * Math.sin(phi) * Math.sin(theta);
+        Math.random() * 2 -
+        1;
 
       positions[i3 + 2] =
-        r * Math.cos(phi);
+        Math.sin(angle) *
+        radius;
 
-      // Velocidad individual
       velocities[i3] =
-        (Math.random() - 0.5) * 0.15;
+        (Math.random() - 0.5) *
+        0.15;
 
       velocities[i3 + 1] =
-        Math.random() * 0.25 + 0.02;
+        Math.random() *
+        0.3 +
+        0.05;
 
       velocities[i3 + 2] =
-        (Math.random() - 0.5) * 0.15;
+        (Math.random() - 0.5) *
+        0.15;
 
-      offsets[i] = Math.random() * Math.PI * 2;
+      random[i] =
+        Math.random() *
+        Math.PI *
+        2;
     }
 
     return {
       positions,
       velocities,
-      offsets,
+      random,
     };
-  }, [count, radius]);
+  }, [count]);
+
 
   useFrame((state, delta) => {
-    if (!pointsRef.current) return;
+    if (!pointsRef.current) {
+      return;
+    }
 
-    const positionAttribute =
-      pointsRef.current.geometry.attributes.position;
+    const positions =
+      pointsRef.current.geometry
+        .attributes.position.array;
 
-    const array = positionAttribute.array;
-
-    const time = state.clock.elapsedTime;
+    const time =
+      state.clock.elapsedTime;
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
 
-      let x = array[i3];
-      let y = array[i3 + 1];
-      let z = array[i3 + 2];
-
-      // Movimiento vertical
-      y +=
+      positions[i3 + 1] +=
         particles.velocities[i3 + 1] *
         delta;
 
-      // Movimiento orgánico
-      x +=
+      positions[i3] +=
         Math.sin(
-          time * 1.5 + particles.offsets[i]
+          time +
+          particles.random[i]
         ) *
-        0.002;
+        0.001;
 
-      z +=
+      positions[i3 + 2] +=
         Math.cos(
-          time * 1.2 + particles.offsets[i]
+          time +
+          particles.random[i]
         ) *
-        0.002;
+        0.001;
 
-      // Si sale por arriba, vuelve abajo
-      if (y > radius) {
-        y = -radius;
+      if (positions[i3 + 1] > 1) {
+        positions[i3 + 1] = -1;
       }
-
-      // Mantener partículas dentro de un radio
-      const distance = Math.sqrt(
-        x * x + z * z
-      );
-
-      if (distance > radius) {
-        x *= 0.98;
-        z *= 0.98;
-      }
-
-      array[i3] = x;
-      array[i3 + 1] = y;
-      array[i3 + 2] = z;
     }
 
-    positionAttribute.needsUpdate = true;
+    pointsRef.current.geometry.attributes
+      .position.needsUpdate = true;
 
-    // Rotación global
-    pointsRef.current.rotation.y += delta * 0.08;
+    pointsRef.current.rotation.y +=
+      delta * 0.15;
   });
+
 
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          count={particles.positions.length / 3}
+          count={
+            particles.positions.length / 3
+          }
           array={particles.positions}
           itemSize={3}
         />
       </bufferGeometry>
 
       <pointsMaterial
-        color={color}
+        color="#00ffff"
         size={0.025}
-        sizeAttenuation
         transparent
-        opacity={0.85}
+        opacity={0.9}
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
+        blending={
+          THREE.AdditiveBlending
+        }
       />
     </points>
   );
 }
 
 
-/*
- * Esfera invisible que sirve como referencia
- * para colocar las partículas.
- */
-function ParticleObject() {
-  return (
-    <group position={[0, 0, -1.5]}>
-      <ParticleSystem
-        count={6000}
-        radius={1.5}
-        color="#00ffff"
-      />
+/* =========================================================
+   ESCENA
+========================================================= */
 
-      {/* Pequeño núcleo luminoso */}
-      <mesh>
-        <sphereGeometry args={[0.08, 16, 16]} />
-
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.9}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-
-/*
- * Escena 3D
- */
 function Scene() {
   return (
     <>
-      <ambientLight intensity={1} />
-
-      <ParticleObject />
+      <Particles count={5000} />
     </>
   );
 }
 
 
-/*
- * Aplicación
- */
+/* =========================================================
+   APP
+========================================================= */
+
 export default function App() {
+  const [
+    cameraStarted,
+    setCameraStarted,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  async function startAR() {
+    try {
+      if (
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        throw new Error(
+          "Tu navegador no permite acceder a la cámara."
+        );
+      }
+
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+        },
+        audio: false,
+      });
+
+      setCameraStarted(true);
+
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "No se puede acceder a la cámara. Comprueba los permisos."
+      );
+    }
+  }
+
+
   return (
     <div className="app">
-      <Canvas
-        camera={{
-          position: [0, 0, 0],
-          fov: 70,
-          near: 0.01,
-          far: 100,
-        }}
-        gl={{
-          antialias: true,
-          alpha: true,
-        }}
-      >
-        <XR store={xrStore}>
-          <Scene />
-        </XR>
-      </Canvas>
 
-      <div className="ui">
-        <h1>AR Particles</h1>
+      {!cameraStarted && (
+        <div className="start-screen">
 
-        <p>
-          Apunta la cámara hacia una superficie
-          y entra en modo AR.
-        </p>
+          <h1>
+            ✨ AR Particles
+          </h1>
 
-        <XRButton
-          store={xrStore}
-          mode="immersive-ar"
-          sessionInit={{
-            requiredFeatures: ["hit-test"],
-            optionalFeatures: [
-              "dom-overlay",
-              "anchors",
-            ],
-          }}
-          className="ar-button"
-        >
-          Entrar en AR
-        </XRButton>
-      </div>
+          <p>
+            Activa la cámara para comenzar
+          </p>
+
+          <button
+            onClick={startAR}
+          >
+            Iniciar AR
+          </button>
+
+          {error && (
+            <div className="error">
+              {error}
+            </div>
+          )}
+
+        </div>
+      )}
+
+
+      {cameraStarted && (
+        <>
+          <CameraBackground />
+
+          <Canvas
+            camera={{
+              position: [
+                0,
+                0,
+                3,
+              ],
+              fov: 60,
+            }}
+            gl={{
+              alpha: true,
+              antialias: true,
+            }}
+          >
+            <Scene />
+          </Canvas>
+
+          <div className="ar-ui">
+            <div className="badge">
+              AR activa
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
+
