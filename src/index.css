@@ -4,136 +4,156 @@ body,
 #root {
   width: 100%;
   height: 100%;
-
   margin: 0;
   padding: 0;
-
-  overflow: hidden;
 }
 
 body {
+  overflow: hidden;
   background: #000;
-
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
 }
 
 .app {
-  position: fixed;
-
-  inset: 0;
-
+  position: relative;
   width: 100%;
   height: 100%;
-
-  overflow: hidden;
 }
 
 
-/*
- * Canvas AR
- */
+/* =====================================================
+   DESKTOP
+===================================================== */
 
-#camerafeed {
-  position: fixed;
+.desktop-ui {
+  position: absolute;
 
-  inset: 0;
-
-  width: 100%;
-  height: 100%;
-
-  display: block;
-
-  touch-action: none;
-
-  z-index: 1;
-}
-
-
-/*
- * HUD
- */
-
-.hud {
-  position: fixed;
-
-  top: 25px;
-
+  top: 30px;
   left: 50%;
 
   transform:
     translateX(-50%);
 
-  z-index: 20;
+  text-align: center;
 
-  display: flex;
-
-  flex-direction: column;
-
-  align-items: center;
-
-  gap: 10px;
+  color: white;
 
   pointer-events: none;
 }
 
+.desktop-ui h1 {
+  margin: 0;
 
-.title {
+  font-size: 32px;
+}
+
+.desktop-ui p {
+  margin-top: 8px;
+
+  opacity: 0.7;
+}
+
+
+/* =====================================================
+   iOS AR
+===================================================== */
+
+.ar-screen {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background:
+    radial-gradient(
+      circle at center,
+      #102a35 0%,
+      #05090c 50%,
+      #000 100%
+    );
+
+  color: white;
+}
+
+
+.ar-content {
+  width: min(
+    90%,
+    420px
+  );
+
+  text-align: center;
+}
+
+
+.particle-icon {
+  font-size: 72px;
+
+  margin-bottom: 15px;
+}
+
+
+.ar-content h1 {
+  margin: 0;
+
+  font-size: 38px;
+}
+
+
+.ar-content p {
+  margin:
+    12px 0 30px;
+
+  opacity: 0.7;
+
+  font-size: 17px;
+}
+
+
+/* =====================================================
+   BOTÓN AR
+===================================================== */
+
+.ar-button {
+  display: inline-block;
+
   padding:
-    10px 18px;
+    16px 25px;
 
   border-radius: 999px;
 
-  background:
-    rgba(0, 0, 0, 0.6);
+  background: white;
 
-  color: white;
+  color: #000;
 
-  font-size: 16px;
+  text-decoration: none;
+
+  font-size: 17px;
 
   font-weight: 600;
 
-  backdrop-filter:
-    blur(10px);
+  box-shadow:
+    0 10px 40px
+    rgba(0, 255, 255, 0.25);
 }
 
 
-.status {
-  padding:
-    8px 15px;
+.ar-button:active {
+  transform: scale(0.96);
+}
 
-  border-radius: 999px;
 
-  background:
-    rgba(0, 0, 0, 0.5);
+.ar-hint {
+  display: block;
 
-  color:
-    rgba(255, 255, 255, 0.85);
+  margin-top: 22px;
 
   font-size: 13px;
 
-  backdrop-filter:
-    blur(10px);
-}
+  line-height: 1.5;
 
-
-.error {
-  max-width: 300px;
-
-  padding: 12px;
-
-  border-radius: 12px;
-
-  background:
-    rgba(150, 0, 0, 0.8);
-
-  color: white;
-
-  font-size: 12px;
-
-  text-align: center;
+  opacity: 0.55;
 }
 
