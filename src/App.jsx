@@ -1,169 +1,242 @@
 /* eslint-disable react-hooks/purity */
-import { useState, useEffect, useMemo, useRef } from 'react'
-import '@google/model-viewer'
-import { Canvas, useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
-import './App.css'
+import { useMemo, useRef } from "react";
+import * as THREE from "three";
+import { Canvas, useFrame } from "@react-three/fiber";
+import {
+  XR,
+  createXRStore,
+  XRButton,
+} from "@react-three/xr";
 
-// ---------- Detección de navegador embebido (in-app browser) ----------
-function detectarNavegadorEmbebido() {
-  const ua = navigator.userAgent
-  // Instagram, Facebook, WhatsApp, TikTok, Twitter/X, LinkedIn abren webviews propios
-  return /Instagram|FBAN|FBAV|WhatsApp|TikTok|Twitter|LinkedInApp/i.test(ua)
-}
+const xrStore = createXRStore();
 
-// ---------- Shader de partículas (decorativo, solo desktop) ----------
-const vertexShader = `
-  uniform float uTime;
-  attribute float aRandom;
-  varying float vAlpha;
+/*
+ * Sistema de partículas
+ */
+function ParticleSystem({
+  count = 5000,
+  radius = 2,
+  color = "#00ffff",
+}) {
+  const pointsRef = useRef();
 
-  void main() {
-    vec3 pos = position;
-    pos.y += sin(uTime * 1.5 + aRandom * 20.0) * 0.15;
-    pos.x += cos(uTime * 1.2 + aRandom * 15.0) * 0.1;
+  const particles = useMemo(() => {
+    const positions = new Float32Array(count * 3);
+    const velocities = new Float32Array(count * 3);
+    const offsets = new Float32Array(count);
 
-    vAlpha = 0.3 + 0.5 * (0.5 + 0.5 * sin(uTime * 2.0 + aRandom * 30.0));
-
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-    gl_PointSize = (2.0 + aRandom * 4.0) * (150.0 / -mvPosition.z);
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`
-
-const fragmentShader = `
-  varying float vAlpha;
-  void main() {
-    float d = length(gl_PointCoord - vec2(0.5));
-    if (d > 0.5) discard;
-    float glow = 1.0 - smoothstep(0.0, 0.5, d);
-    gl_FragColor = vec4(vec3(0.4, 0.9, 1.0), glow * vAlpha);
-  }
-`
-
-function SistemaParticulas() {
-  const materialRef = useRef()
-  const count = 300
-
-  const { positions, randoms } = useMemo(() => {
-    const positions = new Float32Array(count * 3)
-    const randoms = new Float32Array(count)
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 8
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 5
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 8
-      randoms[i] = Math.random()
-    }
-    return { positions, randoms }
-  }, [])
+      const i3 = i * 3;
 
-  useFrame((state) => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = state.clock.elapsedTime
+      // Distribución inicial alrededor del origen
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+
+      const r = Math.pow(Math.random(), 1 / 3) * radius;
+
+      positions[i3] =
+        r * Math.sin(phi) * Math.cos(theta);
+
+      positions[i3 + 1] =
+        r * Math.sin(phi) * Math.sin(theta);
+
+      positions[i3 + 2] =
+        r * Math.cos(phi);
+
+      // Velocidad individual
+      velocities[i3] =
+        (Math.random() - 0.5) * 0.15;
+
+      velocities[i3 + 1] =
+        Math.random() * 0.25 + 0.02;
+
+      velocities[i3 + 2] =
+        (Math.random() - 0.5) * 0.15;
+
+      offsets[i] = Math.random() * Math.PI * 2;
     }
-  })
+
+    return {
+      positions,
+      velocities,
+      offsets,
+    };
+  }, [count, radius]);
+
+  useFrame((state, delta) => {
+    if (!pointsRef.current) return;
+
+    const positionAttribute =
+      pointsRef.current.geometry.attributes.position;
+
+    const array = positionAttribute.array;
+
+    const time = state.clock.elapsedTime;
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+
+      let x = array[i3];
+      let y = array[i3 + 1];
+      let z = array[i3 + 2];
+
+      // Movimiento vertical
+      y +=
+        particles.velocities[i3 + 1] *
+        delta;
+
+      // Movimiento orgánico
+      x +=
+        Math.sin(
+          time * 1.5 + particles.offsets[i]
+        ) *
+        0.002;
+
+      z +=
+        Math.cos(
+          time * 1.2 + particles.offsets[i]
+        ) *
+        0.002;
+
+      // Si sale por arriba, vuelve abajo
+      if (y > radius) {
+        y = -radius;
+      }
+
+      // Mantener partículas dentro de un radio
+      const distance = Math.sqrt(
+        x * x + z * z
+      );
+
+      if (distance > radius) {
+        x *= 0.98;
+        z *= 0.98;
+      }
+
+      array[i3] = x;
+      array[i3 + 1] = y;
+      array[i3 + 2] = z;
+    }
+
+    positionAttribute.needsUpdate = true;
+
+    // Rotación global
+    pointsRef.current.rotation.y += delta * 0.08;
+  });
 
   return (
-    <points>
+    <points ref={pointsRef}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
-        <bufferAttribute attach="attributes-aRandom" count={count} array={randoms} itemSize={1} />
+        <bufferAttribute
+          attach="attributes-position"
+          count={particles.positions.length / 3}
+          array={particles.positions}
+          itemSize={3}
+        />
       </bufferGeometry>
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={{ uTime: { value: 0 } }}
+
+      <pointsMaterial
+        color={color}
+        size={0.025}
+        sizeAttenuation
         transparent
+        opacity={0.85}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
     </points>
-  )
+  );
 }
 
-function CapaParticulasDecorativas() {
+
+/*
+ * Esfera invisible que sirve como referencia
+ * para colocar las partículas.
+ */
+function ParticleObject() {
   return (
-    <Canvas
-      className="particulas-overlay"
-      camera={{ position: [0, 0, 5], fov: 50 }}
-      gl={{ alpha: true }}
-    >
-      <SistemaParticulas />
-    </Canvas>
-  )
+    <group position={[0, 0, -1.5]}>
+      <ParticleSystem
+        count={6000}
+        radius={1.5}
+        color="#00ffff"
+      />
+
+      {/* Pequeño núcleo luminoso */}
+      <mesh>
+        <sphereGeometry args={[0.08, 16, 16]} />
+
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+    </group>
+  );
 }
 
-// ---------- Pantalla de aviso para navegadores embebidos ----------
-function AvisoNavegadorEmbebido() {
+
+/*
+ * Escena 3D
+ */
+function Scene() {
   return (
-    <main className="ar-screen">
-      <div className="ar-content">
-        <div className="robot-icon">⚠️</div>
-        <h1>Abre esto en tu navegador</h1>
-        <p>
-          Para ver a Robbi en realidad aumentada, toca el menú "···" y elige
-          "Abrir en Safari" o "Abrir en Chrome".
-        </p>
-      </div>
-    </main>
-  )
+    <>
+      <ambientLight intensity={1} />
+
+      <ParticleObject />
+    </>
+  );
 }
 
-// ---------- Visor principal con model-viewer ----------
-function VisorModelo() {
-  const esTouchDevice = useMemo(
-    () => 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-    []
-  )
 
+/*
+ * Aplicación
+ */
+export default function App() {
   return (
-    <main className="app">
-      <model-viewer
-        src="/models/robbi.glb"
-        ios-src="/models/robbi.usdz"
-        alt="Robbi, un modelo 3D"
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        camera-controls
-        auto-rotate
-        shadow-intensity="1"
-        exposure="1"
-        environment-image="neutral"
-        loading="eager"
-        reveal="auto"
-        style={{ width: '100%', height: '100%', backgroundColor: '#111' }}
+    <div className="app">
+      <Canvas
+        camera={{
+          position: [0, 0, 0],
+          fov: 70,
+          near: 0.01,
+          far: 100,
+        }}
+        gl={{
+          antialias: true,
+          alpha: true,
+        }}
       >
-        <button slot="ar-button" className="ar-button">
-          📱 Ver en tu espacio
-        </button>
+        <XR store={xrStore}>
+          <Scene />
+        </XR>
+      </Canvas>
 
-        <div slot="progress-bar" className="progress-bar-hidden" />
-      </model-viewer>
+      <div className="ui">
+        <h1>AR Particles</h1>
 
-      {!esTouchDevice && <CapaParticulasDecorativas />}
+        <p>
+          Apunta la cámara hacia una superficie
+          y entra en modo AR.
+        </p>
 
-      <div className="desktop-ui">
-        <h1>Robbi</h1>
-        <p>Explora el modelo 3D — arrastra para rotar</p>
+        <XRButton
+          store={xrStore}
+          mode="immersive-ar"
+          sessionInit={{
+            requiredFeatures: ["hit-test"],
+            optionalFeatures: [
+              "dom-overlay",
+              "anchors",
+            ],
+          }}
+          className="ar-button"
+        >
+          Entrar en AR
+        </XRButton>
       </div>
-    </main>
-  )
+    </div>
+  );
 }
-
-function App() {
-  const [embebido, setEmbebido] = useState(null)
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEmbebido(detectarNavegadorEmbebido())
-  }, [])
-
-  if (embebido === null) return null // evita flash mientras se detecta
-
-  if (embebido) return <AvisoNavegadorEmbebido />
-
-  return <VisorModelo />
-}
-
-export default App

@@ -3,14 +3,84 @@ body,
 #root {
   width: 100%;
   height: 100%;
-
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
-
 body {
-  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #000;
+}
 
-  font-family: sans-serif;
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+canvas {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.ui {
+  position: absolute;
+  z-index: 10;
+
+  left: 50%;
+  bottom: 30px;
+
+  transform: translateX(-50%);
+
+  width: min(90%, 420px);
+
+  padding: 20px;
+
+  box-sizing: border-box;
+
+  color: white;
+  text-align: center;
+
+  background: rgba(0, 0, 0, 0.65);
+
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
+  border-radius: 20px;
+
+  backdrop-filter: blur(12px);
+}
+
+.ui h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.ui p {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+}
+
+.ar-button {
+  appearance: none;
+
+  border: 0;
+  border-radius: 999px;
+
+  padding: 14px 24px;
+
+  background: white;
+  color: black;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.ar-button:active {
+  transform: scale(0.96);
 }
